@@ -15,6 +15,8 @@ import { discoverTools } from "./lib/tools.js";
 
 import path from "path";
 import { fileURLToPath } from "url";
+import { generateUI } from "./ai/orchestrator.js";
+import { executeCreateTables } from "./ai/executors/createTable.executor.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +89,7 @@ async function run() {
 
   if (isSSE) {
     const app = express();
+    app.use(express.json());
     const transports = {};
     const servers = {};
 
@@ -129,6 +132,41 @@ async function run() {
         await transport.handlePostMessage(req, res);
       } else {
         res.status(400).send("No transport/server found for sessionId");
+      }
+    });
+
+    app.post("/ai/ui", async (req, res) => {
+      try {
+        const { prompt, project_id, environment_id, x_api_key } = req.body;
+
+        if (!prompt || !project_id || !environment_id || !x_api_key) {
+          return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        const { ui_spec } = await generateUI({ prompt });
+
+        const executed_actions = await executeCreateTables({
+          uiSpec: ui_spec,
+          context: {
+            project_id,
+            environment_id,
+            x_api_key,
+          },
+          callTool: async (name, args) => {
+            const tool = tools.find((t) => t.definition.function.name === name);
+            if (!tool) throw new Error(`Tool not found: ${name}`);
+            return await tool.function(args);
+          },
+        });
+
+        res.json({
+          status: "ok",
+          ui_spec,
+          executed_actions,
+        });
+      } catch (err) {
+        console.error("[AI/UI EXECUTION]", err);
+        res.status(500).json({ error: err.message });
       }
     });
 
