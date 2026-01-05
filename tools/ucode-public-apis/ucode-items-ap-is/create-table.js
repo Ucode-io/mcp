@@ -2,7 +2,6 @@
  * Function to create a table in Ucode API.
  *
  * @param {Object} args - Arguments for creating the table.
- * @param {string} args.app_id - The application ID for the table.
  * @param {string} args.label - The label for the table.
  * @param {string} [args.description=""] - The description for the table.
  * @param {string} [args.slug=""] - The slug for the table.
@@ -12,16 +11,21 @@
  * @param {boolean} [args.is_cached=false] - Whether the table is cached.
  * @param {boolean} [args.soft_delete=false] - Whether the table supports soft delete.
  * @param {boolean} [args.order_by=false] - Whether to order by the table.
- * @param {string} args.x_api_key - The DBML string to be converted.
+ * @param {string} args.x_api_key - The X-API-KEY.
  * @returns {Promise<Object>} - The result of the table creation.
  */
-const executeFunction = async ({ app_id, label, description = "", slug = "", show_in_menu = true, attributes = {}, is_login_table = false, is_cached = false, soft_delete = false, order_by = false, x_api_key }) => {
+const executeFunction = async ({ label, description = "", slug = "", show_in_menu = true, attributes = {}, is_login_table = false, is_cached = false, soft_delete = false, order_by = false, x_api_key }) => {
   const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
-  const xapikey = x_api_key; // will be provided by the user
+  const xapikey = x_api_key; // provided by the user
   const auth_method = 'API-KEY'; // static value based on the collection
+
+  // As requested: treat x_api_key as the only identifier; use it as app_id in request body.
+  const appId = typeof xapikey === "string" ? xapikey.trim() : "";
+  if (!appId) return { error: "Missing required x_api_key." };
+
   const requestBody = {
     show_in_menu,
-    app_id,
+    app_id: appId,
     label,
     description,
     slug,
@@ -47,8 +51,13 @@ const executeFunction = async ({ app_id, label, description = "", slug = "", sho
 
     // Check if the response was successful
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData);
+      const errorText = await response.text();
+      return {
+        error: "Ucode API returned a non-2xx response while creating table",
+        status: response.status,
+        body: errorText,
+        requestBody,
+      };
     }
 
     // Parse and return the response data
@@ -56,7 +65,7 @@ const executeFunction = async ({ app_id, label, description = "", slug = "", sho
     return data;
   } catch (error) {
     console.error('Error creating table:', error);
-    return { error: 'An error occurred while creating the table.' };
+    return { error: 'An error occurred while creating the table.', details: String(error?.message || error) };
   }
 };
 
@@ -74,10 +83,6 @@ const apiTool = {
       parameters: {
         type: 'object',
         properties: {
-          app_id: {
-            type: 'string',
-            description: 'The application ID for the table.'
-          },
           label: {
             type: 'string',
             description: 'The label for the table.'
@@ -119,7 +124,7 @@ const apiTool = {
             description: 'The X-API-KEY of the environment.'
           }
         },
-        required: ['app_id', 'label', 'x_api_key']
+        required: ['label', 'x_api_key']
       }
     }
   }

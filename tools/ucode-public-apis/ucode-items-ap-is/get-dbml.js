@@ -4,15 +4,18 @@
  * @param {Object} args - Arguments for the request.
  * @param {string} args.projectId - The ID of the project.
  * @param {string} args.environmentId - The ID of the environment.
+ * @param {string} args.x_api_key - The X-API-KEY of the environment.
  * @returns {Promise<Object>} - The result of the DBML retrieval.
  */
-const executeFunction = async ({ projectId, environmentId }) => {
+const executeFunction = async ({ projectId, environmentId, x_api_key }) => {
   const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
   try {
     // Construct the URL with query parameters
     const url = new URL(`${baseUrl}/v1/chart`);
     const headers = {
       'Content-Type': 'application/json',
+      'Authorization': 'API-KEY',
+      'X-API-KEY': x_api_key
     };
     url.searchParams.append('project-id', projectId);
     url.searchParams.append('environment-id', environmentId);
@@ -59,9 +62,13 @@ const apiTool = {
           environmentId: {
             type: 'string',
             description: 'The ID of the environment.'
+          },
+          x_api_key: {
+            type: 'string',
+            description: 'The X-API-KEY of the environment.'
           }
         },
-        required: ['projectId', 'environmentId']
+        required: ['projectId', 'environmentId', 'x_api_key']
       }
     }
   }

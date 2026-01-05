@@ -11,6 +11,19 @@
 
 ---
 
+## Для Anthropic / hosted клиентов (рекомендуется)
+
+Legacy схема `/sse + /messages` часто плохо работает через прокси/туннели и может приводить к таймаутам.
+Для этого в сервер добавлен **Streamable HTTP** endpoint:
+
+- **`/mcp`** (POST/GET) — современный MCP transport.
+
+Если Anthropic пишет `Connection to MCP server timed out`, почти всегда нужно:
+- выставить `MCP_SERVER_URL` на **`https://<tunnel-host>/mcp`** (а не `/sse`)
+- убедиться, что туннель прокидывает путь `/mcp`
+
+---
+
 ## Запуск локально
 
 ```bash
