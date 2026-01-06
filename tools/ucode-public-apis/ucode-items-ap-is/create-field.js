@@ -13,55 +13,79 @@
  * @param {string} args.x_api_key - The DBML string to be converted.
  * @returns {Promise<Object>} - The result of the field creation.
  */
+
 const executeFunction = async ({ label, defaultValue, label_en, enable_multilanguage, table_id, slug, type, required, x_api_key, collection }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
-  const xapikey = x_api_key; 
-  const table = collection; // path variable
-  const url = `${baseUrl}/v2/fields/${table}`;
+    const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+    const xapikey = x_api_key;
+    const table = collection;
+    const url = `${baseUrl}/v2/fields/${table}`;
 
-  const body = {
-    attributes: {
-      label: label || '',
-      defaultValue: defaultValue || '',
-      label_en: label_en || 'Name',
-      enable_multilanguage: enable_multilanguage || false,
-      number_of_rounds: null
-    },
-    default: '',
-    label: label || 'Name',
-    required: required || false,
-    slug: slug || 'name',
-    table_id: table_id,
-    type: type || 'SINGLE_LINE',
-    enable_multilanguage: enable_multilanguage || false,
-    show_label: true
-  };
-
-  try {
-    const headers = {
-      'Authorization': 'API-KEY',
-      'Content-Type': 'application/json',
-      'X-API-KEY': xapikey
+    const body = {
+        attributes: {
+            label: label || '',
+            defaultValue: defaultValue || '',
+            label_en: label_en || 'Name',
+            enable_multilanguage: enable_multilanguage || false,
+            number_of_rounds: null
+        },
+        default: '',
+        label: label || 'Name',
+        required: required || false,
+        slug: slug || 'name',
+        table_id: table_id,
+        type: type || 'SINGLE_LINE',
+        enable_multilanguage: enable_multilanguage || false,
+        show_label: true
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
+    // 🔴 ЛОГИ ПЕРЕД ЗАПРОСОМ
+    console.log('[create_field] URL:', url);
+    console.log('[create_field] BODY:', JSON.stringify(body, null, 2));
+    console.log('[create_field] TABLE_ID:', table_id);
+    console.log('[create_field] COLLECTION:', table);
+    console.log('[create_field] TYPE:', type);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData);
+    try {
+        const headers = {
+            'Authorization': 'API-KEY',
+            'Content-Type': 'application/json',
+            'X-API-KEY': xapikey
+        };
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body)
+        });
+
+        // 🔴 ЛОГ СТАТУСА
+        console.log('[create_field] RESPONSE STATUS:', response.status);
+        console.log('[create_field] RESPONSE OK:', response.ok);
+
+        const rawText = await response.text();
+
+        // 🔴 СЫРОЙ ОТВЕТ СЕРВЕРА
+        console.log('[create_field] RESPONSE RAW:', rawText);
+
+        if (!response.ok) {
+            throw new Error(rawText);
+        }
+
+        const data = JSON.parse(rawText);
+        return data;
+
+    } catch (error) {
+        // 🔴 ПОЛНЫЙ СТЕК
+        console.error('[create_field] ERROR MESSAGE:', error.message);
+        console.error('[create_field] ERROR STACK:', error.stack);
+
+        return {
+            error: 'An error occurred while creating the field.',
+            details: error.message
+        };
     }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error creating field:', error);
-    return { error: 'An error occurred while creating the field.' };
-  }
 };
+
 
 /**
  * Tool configuration for creating a field in Ucode Items API.

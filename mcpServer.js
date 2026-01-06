@@ -76,7 +76,7 @@ async function setupServerHandlers(server, tools) {
         }
         try {
             // <<<< ADDED: log incoming tool call for diagnostics
-            console.log(`[MCP] CallTool request -> name: ${toolName}, args keys: ${Object.keys(args).join(",")}`);
+            // console.log(`[MCP] CallTool request -> name: ${toolName}, args keys: ${Object.keys(args).join(",")}`);
 
             const result = await tool.function(args);
             return {
