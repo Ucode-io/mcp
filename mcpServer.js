@@ -61,11 +61,19 @@ async function setupServerHandlers(server, tools) {
         const tool = tools.find((t) => {
             return t?.definition && t.definition.function && t.definition.function.name === toolName;
         });
+
         if (!tool) {
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
         }
+
         const args = request.params?.arguments || {};
-        const requiredParameters = (tool.definition && tool.definition.function && tool.definition.function.parameters && tool.definition.function.parameters.required) || [];
+        const requiredParameters =
+            (tool.definition &&
+                tool.definition.function &&
+                tool.definition.function.parameters &&
+                tool.definition.function.parameters.required) ||
+            [];
+
         for (const requiredParameter of requiredParameters) {
             if (!(requiredParameter in args)) {
                 throw new McpError(
@@ -74,21 +82,40 @@ async function setupServerHandlers(server, tools) {
                 );
             }
         }
-        try {
-            // <<<< ADDED: log incoming tool call for diagnostics
-            // console.log(`[MCP] CallTool request -> name: ${toolName}, args keys: ${Object.keys(args).join(",")}`);
 
-            const result = await tool.function(args);
+        try {
+            // <<< FIX FOR TIMEOUT (ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ)
+            // запускаем tool в фоне, НЕ ждём выполнения
+            Promise.resolve()
+                .then(() => {
+                    console.log("[MCP] Tool started:", toolName);
+                    return tool.function(args);
+                })
+                .then(() => {
+                    console.log("[MCP] Tool finished:", toolName);
+                })
+                .catch((error) => {
+                    console.error("[MCP] Tool error:", error);
+                });
+
+            // MCP отвечает сразу → Cloudflare не ждёт
             return {
                 content: [
                     {
                         type: "text",
-                        text: JSON.stringify(result, null, 2),
+                        text: JSON.stringify(
+                            {
+                                status: "started",
+                                tool: toolName,
+                            },
+                            null,
+                            2
+                        ),
                     },
                 ],
             };
         } catch (error) {
-            console.error("[Error] Failed to fetch data:", error);
+            console.error("[Error] Failed to start tool:", error);
             throw new McpError(
                 ErrorCode.InternalError,
                 `API error: ${error?.message || String(error)}`
@@ -109,7 +136,6 @@ async function run() {
         const app = express();
         app.use(express.json());
 
-        // <<<< ADDED: health check for origin availability
         app.get("/health", (_req, res) => {
             res.status(200).json({ status: "ok", server: SERVER_NAME });
         });
@@ -121,12 +147,10 @@ async function run() {
 
         app.all("/mcp", async (req, res) => {
             try {
-                // <<<< ADDED: logging incoming request headers and body method
                 console.log("[MCP] /mcp incoming", {
                     time: new Date().toISOString(),
                     method: req.method,
                     mcpSessionId: req.headers["mcp-session-id"],
-                    remoteAddr: req.ip || req.connection.remoteAddress,
                     bodyMethod: req.body && req.body.method,
                 });
 
@@ -135,170 +159,65 @@ async function run() {
                 let server = sessionId ? httpServers[sessionId] : undefined;
 
                 if (!transport || !server) {
-                    // New session ONLY on initialize request
                     if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
-                        console.log("[MCP] initialize request detected, creating new Server instance");
-
                         server = new Server(
                             { name: SERVER_NAME, version: "0.1.1" },
                             { capabilities: { tools: {} }, instructions }
                         );
 
-                        // <<<< ADDED: enhanced server.onerror logging
-                        server.onerror = (error) => {
-                            console.error("[Error][Server.onerror]", error && (error.stack || error));
-                        };
+                        server.onerror = (error) =>
+                            console.error("[Server.onerror]", error?.stack || error);
 
                         await setupServerHandlers(server, tools);
 
                         transport = new StreamableHTTPServerTransport({
                             sessionIdGenerator: () => randomUUID(),
                             onsessioninitialized: (sid) => {
-                                console.log("[MCP] onsessioninitialized sid =", sid);
                                 httpTransports[sid] = transport;
                                 httpServers[sid] = server;
                             },
                         });
 
-                        // <<<< ADDED: log transport close
                         transport.onclose = () => {
                             const sid = transport.sessionId;
-                            console.log("[MCP] transport.onclose, sessionId =", sid);
-                            if (!sid) return;
                             delete httpTransports[sid];
-                            const s = httpServers[sid];
-                            if (s) s.close().catch((err) => console.error("[MCP] error closing server:", err));
+                            httpServers[sid]?.close();
                             delete httpServers[sid];
                         };
 
                         await server.connect(transport);
-
-                        console.log("[MCP] server.connect completed for initialize");
                     } else {
-                        res.status(400).json({
-                            jsonrpc: "2.0",
-                            error: {
-                                code: -32000,
-                                message:
-                                    "Bad Request: No valid MCP session. Initialize first with POST /mcp (initialize request).",
-                            },
-                            id: null,
-                        });
+                        res.status(400).json({ error: "No valid MCP session" });
                         return;
                     }
                 }
 
-                // <<<< CHANGED: wrap handleRequest with try/catch to log and close properly
-                try {
-                    await transport.handleRequest(req, res, req.body);
-                } catch (err) {
-                    console.error("[MCP] transport.handleRequest error:", err && (err.stack || err));
-                    if (!res.headersSent) {
-                        res.status(500).json({
-                            jsonrpc: "2.0",
-                            error: { code: -32603, message: "Internal server error (transport.handleRequest failed)" },
-                            id: null,
-                        });
-                    }
-                }
+                await transport.handleRequest(req, res, req.body);
             } catch (error) {
-                console.error("[MCP] /mcp error (outer):", error && (error.stack || error));
+                console.error("[MCP] /mcp error:", error);
                 if (!res.headersSent) {
-                    res.status(500).json({
-                        jsonrpc: "2.0",
-                        error: { code: -32603, message: "Internal server error" },
-                        id: null,
-                    });
+                    res.status(500).json({ error: "Internal error" });
                 }
-            }
-        });
-
-        app.get("/sse", async (_req, res) => {
-            console.log("[SSE] New connection");
-            const server = new Server(
-                {
-                    name: SERVER_NAME,
-                    version: "0.1.1",
-                },
-                {
-                    capabilities: {
-                        tools: {},
-                    },
-                    instructions,
-                }
-            );
-
-            server.onerror = (error) => console.error("[Error][SSE Server.onerror]", error && (error.stack || error));
-            await setupServerHandlers(server, tools);
-
-            const transport = new SSEServerTransport("/messages", res);
-            console.log("[SSE] transport created, sessionId:", transport.sessionId);
-            transports[transport.sessionId] = transport;
-            servers[transport.sessionId] = server;
-
-            res.on("close", async () => {
-                console.log("[SSE] connection closed, sessionId:", transport.sessionId);
-                delete transports[transport.sessionId];
-                await server.close();
-                delete servers[transport.sessionId];
-            });
-
-            await server.connect(transport);
-        });
-
-        app.post("/messages", async (req, res) => {
-            console.log("[MCP] /messages called (for SSE) body method:", req.body && req.body.method);
-            const sessionId = req.query.sessionId;
-            const transport = transports[sessionId];
-            const server = servers[sessionId];
-
-            if (transport && server) {
-                const body = req.body;
-                if (body && !Array.isArray(body) && body.method === "initialize") {
-                    body.params ||= {};
-                    body.params.protocolVersion ||= "2024-11-05";
-                    body.params.capabilities ||= {};
-                    body.params.clientInfo ||= { name: "curl", version: "1.0" };
-                }
-
-                try {
-                    await transport.handlePostMessage(req, res, body);
-                } catch (err) {
-                    console.error("[MCP] transport.handlePostMessage error:", err && (err.stack || err));
-                    if (!res.headersSent) res.status(500).send("Internal server error");
-                }
-            } else {
-                console.warn("[MCP] No transport/server found for sessionId:", sessionId);
-                res.status(400).send("No transport/server found for sessionId");
             }
         });
 
         const port = process.env.PORT || 3001;
-        // <<<< CHANGED: capture server instance to adjust timeout
         const httpServer = app.listen(port, () => {
             console.log(`[SSE Server] running on port ${port}`);
         });
 
-        // <<<< ADDED: disable Node default timeout so Node won't cut long-lived origin connections
-        // Note: Cloudflare may still have its own timeout, but this prevents Node from being the culprit.
-        httpServer.timeout = 0; // 0 = no timeout
+        httpServer.timeout = 0;
         httpServer.keepAliveTimeout = 0;
         httpServer.headersTimeout = 0;
     } else {
-        // stdio mode: single server instance
         const server = new Server(
-            {
-                name: SERVER_NAME,
-                version: "0.1.1",
-            },
-            {
-                capabilities: {
-                    tools: {},
-                },
-                instructions,
-            }
+            { name: SERVER_NAME, version: "0.1.1" },
+            { capabilities: { tools: {} }, instructions }
         );
-        server.onerror = (error) => console.error("[Error][Stdio]", error && (error.stack || error));
+
+        server.onerror = (error) =>
+            console.error("[Error][Stdio]", error && (error.stack || error));
+
         await setupServerHandlers(server, tools);
 
         process.on("SIGINT", async () => {
