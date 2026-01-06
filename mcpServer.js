@@ -306,12 +306,9 @@ async function run() {
             process.exit(0);
         });
 
-
-
         const transport = new StdioServerTransport();
         await server.connect(transport);
     }
-
 
 }
 
