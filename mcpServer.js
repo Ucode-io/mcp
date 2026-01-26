@@ -2,11 +2,11 @@
 
 import dotenv from "dotenv";
 import express from "express";
-import { randomUUID } from "node:crypto";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {randomUUID} from "node:crypto";
+import {Server} from "@modelcontextprotocol/sdk/server/index.js";
+import {StdioServerTransport} from "@modelcontextprotocol/sdk/server/stdio.js";
+import {SSEServerTransport} from "@modelcontextprotocol/sdk/server/sse.js";
+import {StreamableHTTPServerTransport} from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
     CallToolRequestSchema,
     ErrorCode,
@@ -14,15 +14,15 @@ import {
     ListToolsRequestSchema,
     McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { discoverTools } from "./lib/tools.js";
+import {discoverTools} from "./lib/tools.js";
 
 import path from "path";
-import { fileURLToPath } from "url";
+import {fileURLToPath} from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({path: path.resolve(__dirname, ".env")});
 
 const SERVER_NAME = "ucode";
 
@@ -111,7 +111,7 @@ async function run() {
 
         // <<<< ADDED: health check for origin availability
         app.get("/health", (_req, res) => {
-            res.status(200).json({ status: "ok", server: SERVER_NAME });
+            res.status(200).json({status: "ok", server: SERVER_NAME});
         });
 
         const transports = {};
@@ -140,8 +140,8 @@ async function run() {
                         console.log("[MCP] initialize request detected, creating new Server instance");
 
                         server = new Server(
-                            { name: SERVER_NAME, version: "0.1.1" },
-                            { capabilities: { tools: {} }, instructions }
+                            {name: SERVER_NAME, version: "0.1.1"},
+                            {capabilities: {tools: {}}, instructions}
                         );
 
                         // <<<< ADDED: enhanced server.onerror logging
@@ -196,7 +196,7 @@ async function run() {
                     if (!res.headersSent) {
                         res.status(500).json({
                             jsonrpc: "2.0",
-                            error: { code: -32603, message: "Internal server error (transport.handleRequest failed)" },
+                            error: {code: -32603, message: "Internal server error (transport.handleRequest failed)"},
                             id: null,
                         });
                     }
@@ -206,7 +206,7 @@ async function run() {
                 if (!res.headersSent) {
                     res.status(500).json({
                         jsonrpc: "2.0",
-                        error: { code: -32603, message: "Internal server error" },
+                        error: {code: -32603, message: "Internal server error"},
                         id: null,
                     });
                 }
@@ -258,7 +258,7 @@ async function run() {
                     body.params ||= {};
                     body.params.protocolVersion ||= "2024-11-05";
                     body.params.capabilities ||= {};
-                    body.params.clientInfo ||= { name: "curl", version: "1.0" };
+                    body.params.clientInfo ||= {name: "curl", version: "1.0"};
                 }
 
                 try {

@@ -6,5 +6,6 @@ export const toolPaths = [
   'ucode-public-apis/ucode-items-ap-is/create-table.js',
   'ucode-public-apis/ucode-items-ap-is/update-table.js',
   'ucode-public-apis/ucode-items-ap-is/get-menus.js',
-  'ucode-public-apis/ucode-items-ap-is/get-table-details.js'
+  'ucode-public-apis/ucode-items-ap-is/get-table-details.js',
+  'ucode-public-apis/ucode-items-ap-is/create-table-item.js'
 ];
