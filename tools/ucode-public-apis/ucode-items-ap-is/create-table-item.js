@@ -65,21 +65,21 @@ const apiTool = {
         type: 'function',
         function: {
             name: 'create_table_item',
-            description: 'Create a new item (row) in a Ucode table. Accepts dynamic field data based on the table schema.',
+            description: 'CRITICAL: Create a new row/record in a Ucode table. This tool MUST be called after tables and fields are created to populate them with test data. Each table should have at least 3 test records.',
             parameters: {
                 type: 'object',
                 properties: {
                     table_slug: {
                         type: 'string',
-                        description: 'The slug of the table where the item will be created (e.g., "enrollment", "users").'
+                        description: 'The slug of the table where the item will be created. Use the exact slug from create_table response (e.g., "customers", "products", "orders").'
                     },
                     data: {
                         type: 'object',
-                        description: 'An object containing field names as keys and their values. The fields must match the table schema. Example: { "enrollment_date": "2026-01-01", "status": [null], "monthly_deduction": 324 }'
+                        description: 'An object with field slugs as keys and their values. Use field slugs from update_table, not labels. Example: {"name": "John Doe", "email": "john@example.com", "status": "active", "amount": 1500}'
                     },
                     x_api_key: {
                         type: 'string',
-                        description: 'The X-API-KEY for authentication.'
+                        description: 'The X-API-KEY for authentication (same key used for create_table and update_table).'
                     }
                 },
                 required: ['table_slug', 'data', 'x_api_key']
