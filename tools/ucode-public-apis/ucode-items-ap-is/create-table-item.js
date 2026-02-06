@@ -7,6 +7,53 @@
  * @param {string} args.x_api_key - The X-API-KEY for authentication.
  * @returns {Promise<Object>} - The result of the item creation.
  */
+
+/**
+ * Normalize data values to match Ucode API expectations:
+ * - Convert ALL values to strings (ucode stores most fields as varchar)
+ * - Handle arrays by converting items to strings
+ * - Add attributes object if not present
+ */
+const normalizeData = (data) => {
+    const normalized = {
+        attributes: {} // Always include empty attributes object
+    };
+
+    for (const [key, value] of Object.entries(data)) {
+        // Skip attributes key if already in data - we handle it above
+        if (key === 'attributes') {
+            if (typeof value === 'object' && value !== null) {
+                normalized.attributes = value;
+            }
+            continue;
+        }
+
+        if (value === null || value === undefined) {
+            // Skip null/undefined values
+            continue;
+        } else if (typeof value === 'number') {
+            // Convert numbers to strings
+            normalized[key] = String(value);
+        } else if (typeof value === 'boolean') {
+            // Convert boolean to string "true" or "false"
+            normalized[key] = String(value);
+        } else if (Array.isArray(value)) {
+            // For arrays (relations, multi-select), convert items to strings
+            normalized[key] = value.map(item =>
+                item === null || item === undefined ? null : String(item)
+            ).filter(item => item !== null);
+        } else if (typeof value === 'object') {
+            // Keep objects as-is (for nested data)
+            normalized[key] = value;
+        } else {
+            // Strings and other types - ensure it's a string
+            normalized[key] = String(value);
+        }
+    }
+
+    return normalized;
+};
+
 const executeFunction = async ({
     table_slug,
     data,
@@ -22,10 +69,14 @@ const executeFunction = async ({
     try {
         const url = `${baseUrl}/v2/items/${table_slug}`;
 
+        // Normalize data to fix type mismatches
+        const normalizedData = normalizeData(data);
+
         console.log(`[MCP] create_table_item calling: ${url}`);
+        console.log(`[MCP] create_table_item data:`, JSON.stringify(normalizedData));
 
         const requestBody = {
-            data: data
+            data: normalizedData
         };
 
         const response = await fetch(url, {
@@ -40,14 +91,17 @@ const executeFunction = async ({
 
         if (!response.ok) {
             const errorText = await response.text();
+            console.error(`[MCP] create_table_item error response:`, errorText);
             return {
                 error: "Ucode API returned a non-2xx response while creating table item",
                 status: response.status,
                 body: errorText,
+                sentData: normalizedData  // Include sent data for debugging
             };
         }
 
         const result = await response.json();
+        console.log(`[MCP] create_table_item success:`, JSON.stringify(result));
         return result;
     } catch (error) {
         console.error('Error creating table item:', error);
