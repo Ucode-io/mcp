@@ -9,7 +9,7 @@
  * @returns {Promise<Object>} - The result of the table update.
  */
 const executeFunction = async ({ tableSlug, xapikey, fields, relations }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+  const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
   const url = `${baseUrl}/v1/table/${tableSlug}/mcp`;
   const auth_method = 'API-KEY';
   const payload = {

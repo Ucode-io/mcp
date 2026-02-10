@@ -12,7 +12,7 @@ const executeFunction = async ({
     parent_id,
     x_api_key
 }) => {
-    const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+    const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
     const auth_method = 'API-KEY';
 
     if (!x_api_key) return { error: "Missing required x_api_key." };

@@ -30,7 +30,7 @@ const executeFunction = async ({
                                    menu_id = null,
                                    icon = ""
                                }) => {
-    const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+    const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
     const xapikey = x_api_key; // provided by the user
     const auth_method = 'API-KEY'; // static value based on the collection
 

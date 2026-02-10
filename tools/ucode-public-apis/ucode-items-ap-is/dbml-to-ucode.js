@@ -9,7 +9,7 @@
  * @returns {Promise<Object>} - The result of the conversion.
  */
 const executeFunction = async ({ dbml, x_api_key, view_fields, menus }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run'; // Base URL for the API
+  const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io'; // Base URL for the API
   const apiKey = x_api_key;
   const authMethod = 'API-KEY'; // will be provided by the user
   try {

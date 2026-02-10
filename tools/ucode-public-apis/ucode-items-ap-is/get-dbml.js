@@ -8,7 +8,7 @@
  * @returns {Promise<Object>} - The result of the DBML retrieval.
  */
 const executeFunction = async ({ projectId, environmentId, x_api_key }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+  const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
   try {
     // Construct the URL with query parameters
     const url = new URL(`${baseUrl}/v1/chart`);

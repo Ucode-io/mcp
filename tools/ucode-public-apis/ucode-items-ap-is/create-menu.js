@@ -13,7 +13,7 @@
  * @returns {Promise<Object>} - The result of the menu creation.
  */
 const executeFunction = async ({ icon, attributes, parent_id, type, label, x_api_key }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+  const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
   const xapikey = x_api_key; // will be provided by the user
   const auth_method = 'API-KEY'; // will be provided by the user
 

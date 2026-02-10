@@ -14,7 +14,7 @@
  * @returns {Promise<Object>} - The result of the field creation.
  */
 const executeFunction = async ({ label, defaultValue, label_en, enable_multilanguage, table_id, slug, type, required, x_api_key, collection }) => {
-  const baseUrl = process.env.BASE_URL || 'https://admin-api.ucode.run';
+  const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
   const xapikey = x_api_key; 
   const table = collection; // path variable
   const url = `${baseUrl}/v2/fields/${table}`;
