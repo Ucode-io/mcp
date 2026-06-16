@@ -102,13 +102,9 @@ const apiTool = {
           label: {
             type: 'string',
             description: 'The label for the menu.'
-          },
-          x_api_key: {
-            type: 'string',
-            description: 'The X-API-KEY of the environment.'
           }
         },
-        required: ['parent_id', 'type', 'label', 'attributes', 'x_api_key']
+        required: ['parent_id', 'type', 'label', 'attributes']
       }
     }
   }

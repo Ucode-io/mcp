@@ -109,16 +109,12 @@ const apiTool = {
             type: 'boolean',
             description: 'Whether the field is required.'
           },
-          x_api_key: {
-            type: 'string',
-            description: 'The X-API-KEY of the environment.'
-          },
           collection: {
             type: 'string',
             description: 'The collection to which the field belongs (e.g., relaunch).',
           }
         },
-        required: ['table_id', 'slug', 'type', 'x_api_key']
+        required: ['table_id', 'slug', 'type']
       }
     }
   }

@@ -104,11 +104,10 @@ const apiTool = {
                     is_cached: {type: 'boolean', description: 'Whether the table is cached.'},
                     soft_delete: {type: 'boolean', description: 'Whether the table supports soft delete.'},
                     order_by: {type: 'boolean', description: 'Whether to order by the table.'},
-                    x_api_key: {type: 'string', description: 'The X-API-KEY of the environment.'},
                     menu_id: {type: 'string', description: 'An optional menu/folder ID or parent_id that the table will be linked to; if you have a parent_id, you should provide it.'},
                     icon: {type: 'string', description: 'Optional js icon for the table, https://api.iconify.design/mdi:human-hello.svg like this url'}
                 },
-                required: ['label', 'x_api_key']
+                required: ['label']
             }
         }
     }

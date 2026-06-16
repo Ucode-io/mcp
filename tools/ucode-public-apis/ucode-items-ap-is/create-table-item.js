@@ -130,13 +130,9 @@ const apiTool = {
                     data: {
                         type: 'object',
                         description: 'An object with field slugs as keys and their values. Use field slugs from update_table, not labels. Example: {"name": "John Doe", "email": "john@example.com", "status": "active", "amount": 1500}'
-                    },
-                    x_api_key: {
-                        type: 'string',
-                        description: 'The X-API-KEY for authentication (same key used for create_table and update_table).'
                     }
                 },
-                required: ['table_slug', 'data', 'x_api_key']
+                required: ['table_slug', 'data']
             }
         }
     }

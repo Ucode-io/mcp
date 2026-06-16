@@ -67,10 +67,6 @@ const apiTool = {
             type: 'string',
             description: 'The DBML string to be converted.'
           },
-          x_api_key: {
-            type: 'string',
-            description: 'The X-API-KEY of the environment.'
-          },
           view_fields: {
             type: 'object',
             description: 'Additional dynamic view_fields (keys and values can vary).',
@@ -85,7 +81,7 @@ const apiTool = {
             }
           }
         },
-        required: ['dbml', 'x_api_key', 'view_fields', 'menus']
+        required: ['dbml', 'view_fields', 'menus']
       }
     }
   }

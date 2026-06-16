@@ -62,10 +62,9 @@ const apiTool = {
             parameters: {
                 type: 'object',
                 properties: {
-                    collection: { type: 'string', description: 'The slug of the table (e.g., the part after table-details/ in the URL).' },
-                    x_api_key: { type: 'string', description: 'The X-API-KEY for authentication.' }
+                    collection: { type: 'string', description: 'The slug of the table (e.g., the part after table-details/ in the URL).' }
                 },
-                required: ['collection', 'x_api_key']
+                required: ['collection']
             }
         }
     }

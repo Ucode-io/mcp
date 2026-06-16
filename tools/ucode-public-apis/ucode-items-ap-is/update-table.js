@@ -8,7 +8,7 @@
  * @param {Array} args.relations - The relations to be updated in the table.
  * @returns {Promise<Object>} - The result of the table update.
  */
-const executeFunction = async ({ tableSlug, xapikey, fields, relations }) => {
+const executeFunction = async ({ tableSlug, x_api_key, fields, relations }) => {
   const baseUrl = process.env.BASE_URL || 'https://api.admin.u-code.io';
   const url = `${baseUrl}/v1/table/${tableSlug}/mcp`;
   const auth_method = 'API-KEY';
@@ -23,7 +23,7 @@ const executeFunction = async ({ tableSlug, xapikey, fields, relations }) => {
     // Set up headers for the request
     const headers = {
       'Authorization': auth_method,
-      'X-API-KEY': xapikey,
+      'X-API-KEY': x_api_key,
       'Content-Type': 'application/json'
     };
 
@@ -66,10 +66,6 @@ const apiTool = {
           tableSlug: {
             type: 'string',
             description: 'The table slug for the API.'
-          },
-          xapikey: {
-            type: 'string',
-            description: 'The API key for authorization.'
           },
           fields: {
             type: 'array',
@@ -133,7 +129,7 @@ const apiTool = {
             }
           }
         },
-        required: ['tableSlug', 'xapikey', 'fields', 'relations']
+        required: ['tableSlug', 'fields', 'relations']
       }
     }
   }

@@ -51,7 +51,40 @@ async function transformTools(tools) {
         .filter(Boolean);
 }
 
-async function setupServerHandlers(server, tools) {
+function extractApiKey(req) {
+    // Node lowercases header names; check both just in case.
+    return (req?.headers?.["x-api-key"] || req?.headers?.["X-API-KEY"] || "").trim();
+}
+
+// Validates the key against the gateway and returns the bound session context, or null if invalid.
+async function validateApiKey(apiKey) {
+    if (!apiKey) return null;
+    const baseUrl = process.env.BASE_URL || "https://api.admin.u-code.io";
+    try {
+        const resp = await fetch(`${baseUrl}/v1/api-key/validate`, {
+            method: "GET",
+            headers: {"X-API-KEY": apiKey, "Content-Type": "application/json"},
+        });
+        if (!resp.ok) {
+            console.warn("[MCP][auth] validate rejected, status:", resp.status);
+            return null;
+        }
+        const json = await resp.json();
+        const data = json?.data ?? json; // gateway wraps payload in { data }
+        if (!data || data.valid !== true) return null;
+        return {
+            apiKey,
+            appId: data.app_id || "",
+            projectId: data.project_id || "",
+            environmentId: data.environment_id || "",
+        };
+    } catch (error) {
+        console.error("[MCP][auth] validate error:", error?.message || error);
+        return null;
+    }
+}
+
+async function setupServerHandlers(server, tools, authContext = {}) {
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: await transformTools(tools),
     }));
@@ -74,11 +107,21 @@ async function setupServerHandlers(server, tools) {
                 );
             }
         }
-        try {
-            // <<<< ADDED: log incoming tool call for diagnostics
-            // console.log(`[MCP] CallTool request -> name: ${toolName}, args keys: ${Object.keys(args).join(",")}`);
 
-            const result = await tool.function(args);
+        try {
+            // Inject the session's API key + bound project/environment so the LLM never handles auth.
+            // The key always comes from the session; project/env fill in only when the LLM omits them.
+            const enrichedArgs = {...args, x_api_key: authContext.apiKey};
+            if (authContext.projectId) {
+                enrichedArgs.projectId ??= authContext.projectId;
+                enrichedArgs.project_id ??= authContext.projectId;
+            }
+            if (authContext.environmentId) {
+                enrichedArgs.environmentId ??= authContext.environmentId;
+                enrichedArgs.environment_id ??= authContext.environmentId;
+            }
+
+            const result = await tool.function(enrichedArgs);
             return {
                 content: [
                     {
@@ -119,6 +162,33 @@ async function run() {
         const httpTransports = {};
         const httpServers = {};
 
+        // Idle-eviction: bound how long a session (and its API key) can sit in RAM if the
+        // client vanishes without a clean close, so an orphaned key can't linger forever.
+        const sessionLastSeen = new Map(); // sid -> last activity (ms)
+        const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS || 30 * 60 * 1000); // 30 min
+        const touchSession = (sid) => { if (sid) sessionLastSeen.set(sid, Date.now()); };
+        const forgetSession = (sid) => { if (sid) sessionLastSeen.delete(sid); };
+
+        const evictIdleSessions = () => {
+            const now = Date.now();
+            for (const [sid, ts] of sessionLastSeen) {
+                if (now - ts <= SESSION_IDLE_MS) continue;
+                console.log("[MCP] evicting idle session:", sid);
+                const transport = httpTransports[sid] || transports[sid];
+                if (transport && typeof transport.close === "function") {
+                    Promise.resolve(transport.close()).catch(() => {}); // close() fires onclose → cleans maps
+                } else {
+                    delete httpTransports[sid];
+                    delete httpServers[sid];
+                    delete transports[sid];
+                    delete servers[sid];
+                    sessionLastSeen.delete(sid);
+                }
+            }
+        };
+        const sweeper = setInterval(evictIdleSessions, 5 * 60 * 1000);
+        sweeper.unref?.();
+
         app.all("/mcp", async (req, res) => {
             try {
                 // <<<< ADDED: logging incoming request headers and body method
@@ -139,6 +209,17 @@ async function run() {
                     if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
                         console.log("[MCP] initialize request detected, creating new Server instance");
 
+                        // Gate the session on a valid X-API-KEY before doing anything else.
+                        const authContext = await validateApiKey(extractApiKey(req));
+                        if (!authContext) {
+                            res.status(401).json({
+                                jsonrpc: "2.0",
+                                error: {code: -32001, message: "Unauthorized: missing or invalid X-API-KEY"},
+                                id: req.body?.id ?? null,
+                            });
+                            return;
+                        }
+
                         server = new Server(
                             {name: SERVER_NAME, version: "0.1.1"},
                             {capabilities: {tools: {}}, instructions}
@@ -149,7 +230,7 @@ async function run() {
                             console.error("[Error][Server.onerror]", error && (error.stack || error));
                         };
 
-                        await setupServerHandlers(server, tools);
+                        await setupServerHandlers(server, tools, authContext);
 
                         transport = new StreamableHTTPServerTransport({
                             sessionIdGenerator: () => randomUUID(),
@@ -157,6 +238,7 @@ async function run() {
                                 console.log("[MCP] onsessioninitialized sid =", sid);
                                 httpTransports[sid] = transport;
                                 httpServers[sid] = server;
+                                touchSession(sid);
                             },
                         });
 
@@ -169,6 +251,7 @@ async function run() {
                             const s = httpServers[sid];
                             if (s) s.close().catch((err) => console.error("[MCP] error closing server:", err));
                             delete httpServers[sid];
+                            forgetSession(sid);
                         };
 
                         await server.connect(transport);
@@ -187,6 +270,8 @@ async function run() {
                         return;
                     }
                 }
+
+                touchSession(transport.sessionId);
 
                 // <<<< CHANGED: wrap handleRequest with try/catch to log and close properly
                 try {
@@ -213,8 +298,16 @@ async function run() {
             }
         });
 
-        app.get("/sse", async (_req, res) => {
+        app.get("/sse", async (req, res) => {
             console.log("[SSE] New connection");
+
+            // Gate the SSE session on a valid X-API-KEY.
+            const authContext = await validateApiKey(extractApiKey(req));
+            if (!authContext) {
+                res.status(401).json({error: "Unauthorized: missing or invalid X-API-KEY"});
+                return;
+            }
+
             const server = new Server(
                 {
                     name: SERVER_NAME,
@@ -229,18 +322,21 @@ async function run() {
             );
 
             server.onerror = (error) => console.error("[Error][SSE Server.onerror]", error && (error.stack || error));
-            await setupServerHandlers(server, tools);
 
             const transport = new SSEServerTransport("/messages", res);
             console.log("[SSE] transport created, sessionId:", transport.sessionId);
+            await setupServerHandlers(server, tools, authContext);
+
             transports[transport.sessionId] = transport;
             servers[transport.sessionId] = server;
+            touchSession(transport.sessionId);
 
             res.on("close", async () => {
                 console.log("[SSE] connection closed, sessionId:", transport.sessionId);
                 delete transports[transport.sessionId];
                 await server.close();
                 delete servers[transport.sessionId];
+                forgetSession(transport.sessionId);
             });
 
             await server.connect(transport);
@@ -253,6 +349,7 @@ async function run() {
             const server = servers[sessionId];
 
             if (transport && server) {
+                touchSession(sessionId);
                 const body = req.body;
                 if (body && !Array.isArray(body) && body.method === "initialize") {
                     body.params ||= {};
@@ -285,6 +382,13 @@ async function run() {
         httpServer.keepAliveTimeout = 0;
         httpServer.headersTimeout = 0;
     } else {
+        // stdio mode: key comes from the env (set X_API_KEY in the MCP client config).
+        const authContext = await validateApiKey((process.env.X_API_KEY || "").trim());
+        if (!authContext) {
+            console.error("[MCP][stdio] Missing or invalid X_API_KEY env var — set it to a valid ucode API key.");
+            process.exit(1);
+        }
+
         // stdio mode: single server instance
         const server = new Server(
             {
@@ -299,7 +403,7 @@ async function run() {
             }
         );
         server.onerror = (error) => console.error("[Error][Stdio]", error && (error.stack || error));
-        await setupServerHandlers(server, tools);
+        await setupServerHandlers(server, tools, authContext);
 
         process.on("SIGINT", async () => {
             await server.close();

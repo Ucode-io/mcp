@@ -66,11 +66,9 @@ const apiTool = {
             parameters: {
                 type: 'object',
                 properties: {
-                    project_id: { type: 'string', description: 'The UUID of the project.' },
-                    parent_id: { type: 'string', description: 'The UUID of the parent menu/folder.' },
-                    x_api_key: { type: 'string', description: 'The X-API-KEY for authentication.' }
+                    parent_id: { type: 'string', description: 'The UUID of the parent menu/folder.' }
                 },
-                required: ['project_id', 'parent_id', 'x_api_key']
+                required: ['parent_id']
             }
         }
     }

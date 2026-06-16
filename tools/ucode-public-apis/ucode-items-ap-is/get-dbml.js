@@ -54,21 +54,8 @@ const apiTool = {
       description: 'Retrieve DBML from the Ucode API.',
       parameters: {
         type: 'object',
-        properties: {
-          projectId: {
-            type: 'string',
-            description: 'The ID of the project.'
-          },
-          environmentId: {
-            type: 'string',
-            description: 'The ID of the environment.'
-          },
-          x_api_key: {
-            type: 'string',
-            description: 'The X-API-KEY of the environment.'
-          }
-        },
-        required: ['projectId', 'environmentId', 'x_api_key']
+        properties: {},
+        required: []
       }
     }
   }
